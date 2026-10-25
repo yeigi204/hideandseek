@@ -10,14 +10,12 @@ import {
   type HintKind,
   type QuestionDef,
 } from '../game/catalog';
-import { cooldownUntil, playerName, questionLabel, roundQuestions, roundPhase, teamName } from '../game/reducer';
+import { answeredLate, cooldownUntil, limitReached, openQuestions, playerName, questionLabel, roundQuestions, roundPhase, teamName } from '../game/reducer';
 import type { Question } from '../game/types';
 import { useNow } from '../hooks/useNow';
 import {
-  boundsAround,
   CANTONS,
   distance,
-  fetchStations,
   fmtDistance,
   nearestAirport,
   reverseGeocode,
@@ -25,9 +23,10 @@ import {
   type PlaceInfo,
 } from '../lib/geo';
 import { uid } from '../lib/ids';
-import { clockState, fmtAgo, fmtClock } from '../lib/time';
+import { clockState, fmtAgo, fmtClock, now } from '../lib/time';
 import { Countdown, Empty, ExternalLinks, Modal, Section } from './components';
 import { useGameCtx } from './context';
+import { useNearestStation } from './useNearestStation';
 
 interface AskTarget {
   cat: CategoryDef;
@@ -49,6 +48,9 @@ export function QuestionsTab() {
     if (role === 'hider') return null;
     if (role === 'none') return 'Du bist in keinem Team.';
     if (roundPhase(round, t) === 'hiding') return 'Fragen sind erst nach der Versteckphase erlaubt.';
+    if (limitReached(state, round, t)) return 'Das Rundenlimit ist erreicht.';
+    if (state.settings.oneQuestionAtATime && openQuestions(state, round.id).length > 0)
+      return 'Es ist noch eine Frage offen – die nächste geht erst nach der Antwort.';
     const phase = clockState(t, state.windows).phase;
     if (phase === 'rest') return 'Ruhephase – das Spiel ist gestoppt.';
     if (phase === 'before') return 'Das Spiel hat noch nicht begonnen.';
@@ -71,7 +73,8 @@ export function QuestionsTab() {
                       </strong>
                       <br />
                       <span className="muted small">
-                        {playerName(state, q.askedBy)} · {fmtClock(q.askedAt)} · {q.coins} Coins
+                        {playerName(state, q.askedBy)} · {fmtClock(q.askedAt)} ·{' '}
+                        {t > q.deadline ? 'überfällig: Zeit pausiert, keine Coins' : `${q.coins} Coins bei rechtzeitiger Antwort`}
                       </span>
                     </span>
                     <span className={t > q.deadline ? 'overdue' : 'mono'}>
@@ -159,11 +162,14 @@ function History({ questions, onAnswer }: { questions: Question[]; onAnswer?: (q
               {q.answer != null ? (
                 <div className={`qa-a ${q.impossible ? 'impossible' : ''}`}>
                   {q.impossible ? `🚫 Nicht möglich${q.answer ? `: ${q.answer}` : ''}` : `💬 ${q.answer}`}
-                  <span className="muted small"> · {fmtAgo(q.answeredAt ?? t, t)}</span>
+                  <span className="muted small">
+                    {' '}
+                    · {fmtAgo(q.answeredAt ?? t, t)} · {answeredLate(q) ? 'zu spät, keine Coins' : `+${q.coins} Coins`}
+                  </span>
                 </div>
               ) : (
                 <div className="qa-a pending">
-                  ⏳ wartet auf Antwort · <Countdown to={q.deadline} showOverdue overdueText="überfällig" />
+                  ⏳ wartet auf Antwort · <Countdown to={q.deadline} showOverdue overdueText="überfällig, Hiding-Zeit pausiert" />
                   {onAnswer && (
                     <button className="btn small primary" onClick={() => onAnswer(q)}>
                       Antworten
@@ -259,8 +265,10 @@ function AskDialog({ target, onClose }: { target: AskTarget; onClose: () => void
       <ExternalLinks links={q?.links} />
       <ul className="hints">
         <li>
-          Die Hiders erhalten <strong>{cat.coins} Coins</strong> und haben <strong>{cat.answerMinutes} Minuten</strong> Zeit.
+          Die Hiders haben <strong>{cat.answerMinutes} Minuten</strong> Zeit und erhalten <strong>{cat.coins} Coins</strong>, wenn sie rechtzeitig
+          antworten. Danach ist ihre Hiding-Zeit pausiert, bis die Antwort kommt.
         </li>
+        {state.settings.oneQuestionAtATime && <li>Bis zur Antwort könnt ihr keine weitere Frage stellen.</li>}
         <li>Nächste {cat.name}-Frage frühestens in {state.settings.cooldownMinutes} Minuten.</li>
         <li>
           {geo.pos
@@ -304,6 +312,7 @@ function AnswerDialog({ question, onClose }: { question: Question; onClose: () =
       <p className="muted small">
         Zeit: <Countdown to={question.deadline} showOverdue overdueText="überfällig" /> · gefragt von {playerName(state, question.askedBy)}
       </p>
+      {now() > question.deadline && <div className="banner bad">Zu spät: Eure Hiding-Zeit ist pausiert, bis ihr antwortet, und es gibt keine Coins.</div>}
       <ExternalLinks links={def?.links} />
       {def?.hint && <HintPanel kind={def.hint} question={question} onUse={(a) => (spec.type === 'choice' ? void send(a) : setText(a))} />}
 
@@ -462,26 +471,10 @@ function PlaceHint({ kind, mine, theirs, onUse }: { kind: 'canton' | 'grossregio
 }
 
 function StationHint({ pos, onUse }: { pos: LatLng; onUse: (a: string) => void }) {
-  const [res, setRes] = useState<{ name: string; dist: number } | null | 'none'>(null);
-  const [error, setError] = useState<string | null>(null);
-  const posKey = roundedKey(pos);
-  useEffect(() => {
-    let cancelled = false;
-    const here = fromKey(posKey);
-    fetchStations(boundsAround(here, 2500))
-      .then((list) => {
-        if (cancelled) return;
-        const best = list.map((s) => ({ name: s.name, dist: distance(here, s.pos) })).sort((x, y) => x.dist - y.dist)[0];
-        setRes(best ?? 'none');
-      })
-      .catch((e) => !cancelled && setError(e instanceof Error ? e.message : String(e)));
-    return () => {
-      cancelled = true;
-    };
-  }, [posKey]);
-  if (error) return <div className="hint">Bahnhof-Suche nicht möglich: {error}</div>;
-  if (res == null) return <div className="hint">🚉 Suche nächsten Bahnhof …</div>;
-  if (res === 'none') return <div className="hint">Kein Bahnhof im Umkreis von 2.5 km gefunden.</div>;
+  const res = useNearestStation(pos);
+  if (!res || res.status === 'loading') return <div className="hint">🚉 Suche nächsten Bahnhof …</div>;
+  if (res.status === 'error') return <div className="hint">Bahnhof-Suche nicht möglich: {res.error}</div>;
+  if (res.status === 'none') return <div className="hint">Kein Bahnhof im Umkreis von 2.5 km gefunden.</div>;
   // Luftlinie × 1.3 als grobe Wegstrecke, 4.5 km/h
   const minutes = Math.max(1, Math.round(((res.dist * 1.3) / 4500) * 60));
   return (

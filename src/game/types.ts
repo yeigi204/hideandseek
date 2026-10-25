@@ -16,6 +16,12 @@ export interface Settings {
   diceSides: number;
   /** Anzahl Personen für die Kasse; null = alle Spieler */
   splitCount: number | null;
+  /** Neue Frage erst, wenn die vorherige beantwortet ist */
+  oneQuestionAtATime: boolean;
+  /** Wertung: beste Runde oder Summe aller Runden */
+  scoring: 'best' | 'sum';
+  /** Maximale Hiding-Zeit pro Runde; null = unbegrenzt */
+  maxHidingMinutes: number | null;
 }
 
 export interface Team {
@@ -52,7 +58,11 @@ export interface Round {
   /** berechnet: Start der Suchphase */
   seekStartAt: number;
   endedAt?: number;
-  endReason?: 'found' | 'aborted';
+  /** aborted zählt nicht für die Wertung; limit = Rundenlimit erreicht; gameover = Spiel beendet */
+  endReason?: 'found' | 'aborted' | 'limit' | 'gameover';
+  /** Endspiel: Hiders stehen ab hier still */
+  endgameAt?: number;
+  endgameBy?: string | null;
   pauses: Pause[];
 }
 

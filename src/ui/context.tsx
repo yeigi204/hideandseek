@@ -20,6 +20,8 @@ export interface GameCtx {
   setTab: (tab: TabKey) => void;
   /** Öffnet die Anleitung (Mehr → Regeln) */
   openGuide: () => void;
+  /** Öffnet Mehr → Einstellungen */
+  openSettings: () => void;
   /** Führt eine Aktion aus und zeigt Fehler als Meldung an. */
   run: (fn: () => Promise<unknown>, okMessage?: string) => Promise<boolean>;
   toast: (text: string, kind?: ToastKind) => void;

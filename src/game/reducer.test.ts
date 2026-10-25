@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { zonedToEpoch } from '../lib/time';
-import { activeCurses, cooldownUntil, hidingTime, openRound, reduce, roundCoins, teamTotals } from './reducer';
+import { activeCurses, activePause, cooldownUntil, hidingTime, limitReached, openRound, reduce, roundCoins, teamsOnTurn, teamTotals } from './reducer';
 import { settle } from './settle';
 import type { GameEvent } from './types';
 
@@ -84,18 +84,76 @@ describe('Fragen, Coins und Curses', () => {
   const base = game([[0, 'a', 'round_started', { id: 'r1', hiderTeamId: 'rot' }]]);
   const offset = (t: number) => t - T0;
 
-  it('Fragen geben den Hiders Coins, Curses kosten Coins', () => {
+  it('Coins gibt es mit der rechtzeitigen Antwort, Curses kosten Coins', () => {
     const s = reduce(
       game([
         [0, 'a', 'round_started', { id: 'r1', hiderTeamId: 'rot' }],
         [offset(seek + M), 'b', 'question_asked', { id: 'q1', roundId: 'r1', category: 'relativ', key: 'rel-ns', text: 'x', coins: 40, teamId: 'blau' }],
-        [offset(seek + 2 * M), 'b', 'question_asked', { id: 'q2', roundId: 'r1', category: 'radar', key: 'radar', text: 'x', param: 5000, coins: 30, teamId: 'blau' }],
-        [offset(seek + 3 * M), 'a', 'curse_cast', { id: 'c1', roundId: 'r1', number: 4, dice: 1, rolls: [4], cost: 50 }],
-        [offset(seek + 4 * M), 'a', 'curse_cast', { id: 'c2', roundId: 'r1', number: 6, dice: 1, rolls: [6], cost: 50 }],
+        [offset(seek + 2 * M), 'a', 'question_answered', { id: 'q1', answer: 'Nördlicher' }],
+        [offset(seek + 3 * M), 'b', 'question_asked', { id: 'q2', roundId: 'r1', category: 'radar', key: 'radar', text: 'x', param: 5000, coins: 30, teamId: 'blau' }],
+        [offset(seek + 4 * M), 'a', 'question_answered', { id: 'q2', answer: 'Ja' }],
+        [offset(seek + 5 * M), 'a', 'curse_cast', { id: 'c1', roundId: 'r1', number: 16, dice: 1, cost: 50 }],
+        [offset(seek + 6 * M), 'a', 'curse_cast', { id: 'c2', roundId: 'r1', number: 6, dice: 1, cost: 50 }],
       ]),
     );
     expect(roundCoins(s, 'r1')).toEqual({ earned: 70, spent: 50, balance: 20 });
     expect(s.curses.map((c) => c.id)).toEqual(['c1']);
+  });
+
+  it('offene Frage bringt noch keine Coins', () => {
+    const s = reduce([
+      ...base,
+      { seq: 10, at: seek, playerId: 'b', type: 'question_asked', payload: { id: 'q1', roundId: 'r1', category: 'radar', key: 'radar', text: 'x', coins: 30 } },
+    ]);
+    expect(roundCoins(s, 'r1').balance).toBe(0);
+  });
+
+  it('nur eine offene Frage gleichzeitig', () => {
+    const s = reduce([
+      ...base,
+      { seq: 10, at: seek, playerId: 'b', type: 'question_asked', payload: { id: 'q1', roundId: 'r1', category: 'radar', key: 'radar', text: 'x', coins: 30 } },
+      { seq: 11, at: seek + M, playerId: 'b', type: 'question_asked', payload: { id: 'q2', roundId: 'r1', category: 'foto', key: 'foto-kirche', text: 'x', coins: 15 } },
+      { seq: 12, at: seek + 2 * M, playerId: 'a', type: 'question_answered', payload: { id: 'q1', answer: 'Nein' } },
+      { seq: 13, at: seek + 3 * M, playerId: 'b', type: 'question_asked', payload: { id: 'q3', roundId: 'r1', category: 'foto', key: 'foto-kirche', text: 'x', coins: 15 } },
+    ]);
+    expect(s.questions.map((q) => q.id)).toEqual(['q1', 'q3']);
+  });
+
+  it('zu späte Antwort: keine Coins, Hiding-Zeit pausiert bis zur Antwort', () => {
+    const s = reduce([
+      ...base,
+      { seq: 10, at: seek, playerId: 'b', type: 'question_asked', payload: { id: 'q1', roundId: 'r1', category: 'radar', key: 'radar', text: 'x', coins: 30, answerMinutes: 5 } },
+      { seq: 11, at: seek + 25 * M, playerId: 'a', type: 'question_answered', payload: { id: 'q1', answer: 'Ja' } },
+    ]);
+    const r = s.rounds[0];
+    expect(roundCoins(s, 'r1').balance).toBe(0);
+    // 60 min Suchphase, davon 20 min überfällig
+    expect(hidingTime(s, r, seek + H)).toBe(40 * M);
+    expect(activePause(s, r, seek + 10 * M)?.reason).toMatch(/überfällig/);
+  });
+
+  it('nur eine blockierende Curse gleichzeitig', () => {
+    const s = reduce([
+      ...base,
+      { seq: 10, at: seek, playerId: 'a', type: 'coins_adjusted', payload: { roundId: 'r1', delta: 200 } },
+      { seq: 11, at: seek + M, playerId: 'a', type: 'curse_cast', payload: { id: 'c1', roundId: 'r1', number: 3, dice: 1, cost: 50 } },
+      { seq: 12, at: seek + 2 * M, playerId: 'a', type: 'curse_cast', payload: { id: 'c2', roundId: 'r1', number: 5, dice: 1, cost: 50 } },
+      { seq: 13, at: seek + 3 * M, playerId: 'b', type: 'curse_done', payload: { id: 'c1' } },
+      { seq: 14, at: seek + 4 * M, playerId: 'a', type: 'curse_cast', payload: { id: 'c3', roundId: 'r1', number: 5, dice: 1, cost: 50 } },
+    ]);
+    expect(s.curses.map((c) => c.id)).toEqual(['c1', 'c3']);
+    expect(roundCoins(s, 'r1').balance).toBe(100);
+  });
+
+  it('Endspiel starten und zurücknehmen', () => {
+    const s1 = reduce([...base, { seq: 10, at: seek + H, playerId: 'a', type: 'endgame_started', payload: { roundId: 'r1' } }]);
+    expect(s1.rounds[0].endgameAt).toBe(seek + H);
+    const s2 = reduce([
+      ...base,
+      { seq: 10, at: seek + H, playerId: 'a', type: 'endgame_started', payload: { roundId: 'r1' } },
+      { seq: 11, at: seek + H + M, playerId: 'a', type: 'endgame_cancelled', payload: { roundId: 'r1' } },
+    ]);
+    expect(s2.rounds[0].endgameAt).toBeUndefined();
   });
 
   it('Cooldown von 30 min pro Kategorie', () => {
@@ -127,8 +185,39 @@ describe('Fragen, Coins und Curses', () => {
       ...base,
       { seq: 10, at: seek, playerId: 'b', type: 'question_asked', payload: { id: 'q1', roundId: 'r1', category: 'radar', key: 'radar', text: 'x', coins: 30 } },
       { seq: 11, at: seek + M, playerId: 'b', type: 'question_cancelled', payload: { id: 'q1' } },
+      { seq: 12, at: seek + 2 * M, playerId: 'a', type: 'question_answered', payload: { id: 'q1', answer: 'Ja' } },
     ]);
     expect(roundCoins(s, 'r1').balance).toBe(0);
+  });
+});
+
+describe('Wertung', () => {
+  const R = (id: string, team: string, start: number, end: number, reason = 'found'): [number, string, string, object][] => [
+    [start, 'a', 'round_started', { id, hiderTeamId: team }],
+    [end, 'b', 'round_ended', { roundId: id, reason }],
+  ];
+
+  it('beste Runde zählt, abgebrochene Runden zählen nicht', () => {
+    const s = reduce(game([...R('r1', 'rot', 0, 3 * H), ...R('r2', 'blau', 3 * H, 6 * H, 'aborted'), ...R('r3', 'blau', 6 * H, 9 * H + 30 * M), ...R('r4', 'rot', 10 * H, 12 * H + 30 * M)]));
+    const totals = teamTotals(s, T0 + 20 * H);
+    expect(totals.map((x) => [x.team.id, x.rounds, x.total])).toEqual([
+      ['blau', 1, H + 30 * M],
+      ['rot', 2, H],
+    ]);
+  });
+
+  it('nur Teams mit den wenigsten Runden sind an der Reihe', () => {
+    const s = reduce(game([...R('r1', 'rot', 0, 3 * H)]));
+    expect([...teamsOnTurn(s)]).toEqual(['blau']);
+  });
+
+  it('Rundenlimit begrenzt die Hiding-Zeit', () => {
+    const s = reduce(game([[0, 'a', 'round_started', { id: 'r1', hiderTeamId: 'rot' }]]));
+    const r = s.rounds[0];
+    // Standard: 2 h verstecken, max. 5 h Hiding-Zeit
+    expect(limitReached(s, r, T0 + 6 * H)).toBe(false);
+    expect(limitReached(s, r, T0 + 7 * H)).toBe(true);
+    expect(hidingTime(s, r, T0 + 9 * H)).toBe(5 * H);
   });
 });
 

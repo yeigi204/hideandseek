@@ -7,7 +7,7 @@ import { useNow } from '../hooks/useNow';
 import { uid } from '../lib/ids';
 import { forgetGame, getPref, setPref } from '../lib/storage';
 import { fmtDayClock, fmtDuration } from '../lib/time';
-import { Empty, Section, TeamChip } from './components';
+import { DaysPicker, Empty, ScheduleSummary, Section, TeamChip } from './components';
 import { useGameCtx } from './context';
 import { notificationsSupported, requestNotifications } from './notify';
 import { GuideView } from './GuideView';
@@ -109,7 +109,7 @@ function GameView() {
                   <td className="small">{fmtDayClock(r.startedAt, t)}</td>
                   <td className="mono">
                     {fmtDuration(hidingTime(state, r, t))}
-                    {r.endedAt == null ? ' ⏱️' : r.endReason === 'found' ? ' 🎯' : ' ⏹️'}
+                    {r.endedAt == null ? ' ⏱️' : { found: ' 🎯', limit: ' ✅', aborted: ' ⏹️ zählt nicht', gameover: ' 🏁' }[r.endReason ?? 'found']}
                   </td>
                 </tr>
               ))}
@@ -127,7 +127,7 @@ function GameView() {
           <button
             className="btn ghost block"
             onClick={() => {
-              if (confirm('Runde abbrechen? Die bisherige Hiding-Zeit zählt.')) void run(() => api.dispatch('round_ended', { roundId: round.id, reason: 'aborted' }));
+              if (confirm('Runde abbrechen? Abgebrochene Runden zählen nicht – das Team ist danach nochmals dran.')) void run(() => api.dispatch('round_ended', { roundId: round.id, reason: 'aborted' }));
             }}
           >
             Runde abbrechen
@@ -458,22 +458,22 @@ function GameSettingsForm() {
         <span>Name des Spiels</span>
         <input value={name} onChange={(e) => setName(e.target.value)} />
       </label>
+      <div className="field">
+        <span>Spieldauer</span>
+        <DaysPicker value={s.days} onChange={(d) => set('days', d)} />
+      </div>
       <div className="grid2">
         <label className="field">
           <span>Starttag</span>
           <input type="date" value={s.startDate} onChange={(e) => set('startDate', e.target.value)} />
         </label>
         <label className="field">
-          <span>Anzahl Tage</span>
-          <input type="number" min={1} max={14} value={s.days} onChange={(e) => set('days', num(e.target.value, 1))} />
-        </label>
-        <label className="field">
           <span>Spielzeit ab</span>
-          <input type="time" value={s.dayStart} onChange={(e) => set('dayStart', e.target.value)} />
+          <input type="time" value={s.dayStart} onChange={(e) => set('dayStart', e.target.value.slice(0, 5))} />
         </label>
         <label className="field">
           <span>Ruhephase ab</span>
-          <input type="time" value={s.dayEnd === '24:00' ? '00:00' : s.dayEnd} onChange={(e) => set('dayEnd', e.target.value)} />
+          <input type="time" value={s.dayEnd === '24:00' ? '00:00' : s.dayEnd} onChange={(e) => set('dayEnd', e.target.value.slice(0, 5))} />
         </label>
         <label className="field">
           <span>Versteckzeit (min)</span>
@@ -495,6 +495,16 @@ function GameSettingsForm() {
           </select>
         </label>
         <label className="field">
+          <span>Rundenlimit (min Hiding-Zeit)</span>
+          <input
+            type="number"
+            min={0}
+            placeholder="kein Limit"
+            value={s.maxHidingMinutes ?? ''}
+            onChange={(e) => set('maxHidingMinutes', e.target.value && Number(e.target.value) > 0 ? num(e.target.value, 1) : null)}
+          />
+        </label>
+        <label className="field">
           <span>Kasse teilen durch</span>
           <input
             type="number"
@@ -505,6 +515,7 @@ function GameSettingsForm() {
           />
         </label>
       </div>
+      <ScheduleSummary settings={s} />
       <div className="field">
         <span>Cooldown gilt</span>
         <div className="seg">
@@ -516,11 +527,26 @@ function GameSettingsForm() {
           </button>
         </div>
       </div>
+      <div className="field">
+        <span>Wertung</span>
+        <div className="seg">
+          <button className={s.scoring === 'best' ? 'on' : ''} onClick={() => set('scoring', 'best')}>
+            beste Runde
+          </button>
+          <button className={s.scoring === 'sum' ? 'on' : ''} onClick={() => set('scoring', 'sum')}>
+            Summe aller Runden
+          </button>
+        </div>
+      </div>
+      <label className="check">
+        <input type="checkbox" checked={s.oneQuestionAtATime} onChange={(e) => set('oneQuestionAtATime', e.target.checked)} />
+        <span>Nur eine offene Frage gleichzeitig</span>
+      </label>
       <label className="check">
         <input type="checkbox" checked={s.countHidingPhase} onChange={(e) => set('countHidingPhase', e.target.checked)} />
         <span>Versteckphase zählt zur Hiding-Zeit</span>
       </label>
-      <p className="muted small">Ausserhalb der Spielzeit (Ruhephase) laufen keine Uhren. Für einen Testlauf z.B. 00:00 bis 00:00 einstellen (= ganzer Tag).</p>
+      <p className="muted small">Ausserhalb der Spielzeit (Ruhephase) laufen keine Uhren. Für einen Testlauf: Starttag heute und 00:00 bis 00:00 (= ganzer Tag).</p>
       <div className="row end">
         {dirty && (
           <button

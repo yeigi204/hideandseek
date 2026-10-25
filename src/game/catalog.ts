@@ -210,75 +210,92 @@ export interface CurseDef {
   pausesHidingMinutes?: number;
   songs?: string[];
   links?: { label: string; url: string }[];
+  /** Blockiert die Curse Fragen und/oder Reisen? Es darf nur eine solche Curse gleichzeitig aktiv sein. */
+  blocks: CurseBlock;
 }
+
+export type CurseBlock = 'questions' | 'travel' | 'both' | 'none';
 
 export const CURSES: CurseDef[] = [
   {
     number: 1,
+    blocks: 'travel',
     title: 'Free Kambly',
     text: 'Bevor ihr euch bewegt: Twintet den Hiders 3.55 CHF für ein Kambly Guetzli (vegane Alternativen sind okay).',
   },
   {
     number: 2,
+    blocks: 'travel',
     title: 'Abfall',
     text: 'Bevor ihr euch bewegt: Jede*r Seeker muss ein Stückchen Abfall aufsammeln und wegwerfen.',
   },
   {
     number: 3,
+    blocks: 'travel',
     title: 'Fitness-Check',
     text: 'Bevor ihr euch bewegt: Die Seekers müssen anhalten und 20 Liegestütze pro Seeker machen, die sie nach Belieben aufteilen können (Beispiel: zwei Seekers können sich die Arbeit 10-10 oder 5-15 teilen).',
   },
   {
     number: 4,
+    blocks: 'both',
     title: 'Unterhaltet einen Hund',
     text: 'Bevor ihr euch bewegt: Unterhaltet einen Hund: Bevor ihr die nächste Frage stellt, findet einen Hund. Erzählt ihm einen lustigen Witz.',
   },
   {
     number: 5,
+    blocks: 'questions',
     title: 'Toot-Toot',
     text: 'Bevor ihr eure nächste Frage stellt, bringt ein motorisiertes Fahrzeug zum Hupen.',
   },
   {
     number: 6,
+    blocks: 'both',
     title: 'Wilhelm-Tell-Curse',
     text: 'Bevor ihr etwas anderes tut, muss eine Person aus 5 Metern Entfernung einen Apfel vom Kopf eines Teammitglieds schiessen. Nach jedem verfehlten Schuss müsst ihr 10 Minuten warten, um nochmals zu probieren.',
     timers: [10],
   },
   {
     number: 7,
+    blocks: 'questions',
     title: 'Heidi-Curse',
     text: 'Bevor ihr eine nächste Frage stellen könnt, muss ein*e Seeker mindestens eine halbe Minute lang lustvoll auf einer Wiese umherhüpfen.',
     timers: [0.5],
   },
   {
     number: 8,
+    blocks: 'both',
     title: 'Rivalen-Curse',
     text: 'Bevor ihr etwas anderes tut, begebt euch in einen Park/Dorfplatz o.Ä. und sprecht für alle Öffentlichkeit zu hören 3 Sachen über eine*n rivalisierenden Klub/Uni/Schule aus, die diese*n negativ machen.',
   },
   {
     number: 9,
+    blocks: 'both',
     title: 'Tanz wie es keiner sieht',
     text: 'Begebe dich 300 Meter vom nächsten Gebäude weg und tanzt alle zusammen einen TikTok-Dance nach Belieben der Hiders fehlerfrei nach. Die Hiders bewerten, ob der Dance fehlerfrei war.',
   },
   {
     number: 10,
+    blocks: 'both',
     title: 'Smalltalk',
     text: 'Bevor ihr etwas anderes tun könnt, ruft eine Lehrperson an und redet mit ihr mindestens 3 Minuten. Ihr dürft ihr in keinster Weise mitteilen, dass sie 3 Minuten dran bleiben soll und auch nicht, weshalb ihr sie anruft. Falls die LP vor den 3 Minuten auflegt, müsst ihr 10 Minuten warten und dann eine andere LP anrufen. Falls sie nicht abnimmt, ruft eine andere LP an.',
     timers: [3, 10],
   },
   {
     number: 11,
+    blocks: 'questions',
     title: 'Postkarten-Curse',
     text: 'Bevor ihr eine nächste Frage stellen könnt: Schreibe entweder physisch oder elektronisch eine Postkarte an einen Lehrer deiner Wahl. Physisch muss die Postkarte etwas mit dem Ort zu tun haben und eine ganze Seite vollgeschrieben sein; elektronisch muss ein Selfie mit eurem Ort gemacht werden und mind. 100 Wörter geschrieben werden. Die Curse ist gelöscht, sobald die Postkarte abgegeben ist.',
   },
   {
     number: 12,
+    blocks: 'both',
     title: 'AI got nothing on me',
     text: 'Bevor ihr etwas anderes tut, erfinden 2 eurer Gruppe einen Witz über den Kanton, in dem ihr euch befindet. Gebt ChatGPT denselben Auftrag. Wenn die 2 anderen aus der Gruppe euren Witz von der KI unterscheiden können, fahrt fort. Wenn nicht, setzt 15 Minuten aus und wiederholt den Prozess mit neuen Witzen. Ihr dürft, ausser beim Vortragen der Witze, nicht miteinander sprechen.',
     timers: [15],
   },
   {
     number: 13,
+    blocks: 'both',
     title: 'Showmaster',
     text: 'Bevor ihr etwas anderes tut, würfelt von 1-6. Lernt bis und mit dem ersten Refrain des Liedes auswendig und sendet eure Karaoke-Performance an die Hiders. Es müssen immer 2 Personen gleichzeitig "singen". Die Verse können aufgeteilt werden.',
     songs: [
@@ -292,6 +309,7 @@ export const CURSES: CurseDef[] = [
   },
   {
     number: 14,
+    blocks: 'travel',
     title: 'Ratatouille Curse',
     text: 'Schaut auf dem Smithsonian Naked-Rat-Livestream vorbei. Fahrt mindestens eine Haltestelle in die Richtung (rechts = Osten usw.), in welche die erste Ratte (die sichtbar ist) rennt. Ihr müsst warten, bis ihr eine Ratte seht. Falls die Ratte für gemessen 15 Minuten nicht zu sehen ist, dürft ihr weiterfahren. (Falls mit Zug nicht möglich, dürfen auch Busse oder Trams benutzt werden.)',
     timers: [15],
@@ -299,34 +317,40 @@ export const CURSES: CurseDef[] = [
   },
   {
     number: 15,
+    blocks: 'both',
     title: 'Burnout',
     text: 'Nehmt euch sofort eine Auszeit. Macht einen mindestens 30 Minuten langen Spaziergang. Euer Startpunkt ist auch das Ende des Spaziergangs.',
     autoTimerMinutes: 30,
   },
   {
     number: 16,
+    blocks: 'none',
     title: 'Analog',
     text: 'Für die nächsten 30 Minuten dürft ihr keine mobilen Hilfsmittel verwenden (SBB App, Google Maps, Google Earth, Apple Maps, Waze und Suchmaschinen o.ä.).',
     autoTimerMinutes: 30,
   },
   {
     number: 17,
+    blocks: 'both',
     title: 'Linguistik-Kurs',
     text: 'Bevor ihr etwas anderes tut: Findet 3 Wörter in eurer Gemeinde, die nicht der Amtssprache der Gemeinde entsprechen. Ausgenommen sind Namen von Geschäften (Restaurants einbezogen), Lebensmittelnamen und Verkehrsschilder.',
   },
   {
     number: 18,
+    blocks: 'both',
     title: 'Stay hydrated',
     text: 'Bevor ihr etwas anderes tut, müsst ihr 4.5/6 Liter Wasser trinken. Jede*r soll mind. 1.5 Liter trinken. Fahrt fort, wenn die letzte Person ausgetrunken hat.',
   },
   {
     number: 19,
+    blocks: 'both',
     title: 'Wählt euer Abenteuer',
     text: 'Bevor ihr etwas anderes tut, entweder:\n• Macht 100 Burpees: Diese dürfen aufgeteilt werden, jedoch darf nur eine Person zur selben Zeit Burpees machen. Burpee = Pushup + in die Luft springen.\noder\n• Ratet die Einwohnerzahl eurer Gemeinde: Ihr habt einen Guess. Ihr müsst innerhalb von 20% der richtigen Antwort liegen. Falls ihr falsch liegt, müsst ihr für 35 Minuten aussetzen. Die Zahl, welche auf Wikipedia liegt, ist korrekt. Ihr dürft keine externen Hilfsmittel verwenden (keine Personen, kein Internet, keine Gemeindetafeln).',
     timers: [35],
   },
   {
     number: 20,
+    blocks: 'travel',
     title: "Ich glaub' es spukt",
     text: 'Ihr müsst 30 Minuten lang an Ort und Stelle bleiben, während die Hiders sich neu positionieren können. Wenn ihr sie während dieser 30 Minuten seht, gilt es NICHT als Catch. Die Hiders dürfen jegliche Form von Transportation verwenden. Die Hiding-Zeit wird gestoppt.',
     autoTimerMinutes: 30,
@@ -335,6 +359,10 @@ export const CURSES: CurseDef[] = [
 ];
 
 export const MAX_CURSE = CURSES.length;
+
+export function curseBlocks(n: number): boolean {
+  return (curseDef(n)?.blocks ?? 'both') !== 'none';
+}
 
 export function curseDef(n: number): CurseDef | undefined {
   return CURSES.find((c) => c.number === n);

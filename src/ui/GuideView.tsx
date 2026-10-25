@@ -31,6 +31,9 @@ export function GuideView({ settings: s, inGame }: { settings: Settings; inGame:
       ? 'Mit einem 20er-Würfel: die Zahl ist die Curse-Nummer.'
       : `Pro ${s.diceCost} Coins ein 6er-Würfel. Die Augensumme aller gekauften Würfel ist die Curse-Nummer (über ${CURSES.length} zählt als ${CURSES.length}). Mehr Würfel = heftigere Curses.`;
 
+  const limit = s.maxHidingMinutes ? hours(s.maxHidingMinutes) : null;
+  const scoring = s.scoring === 'best' ? 'die beste Runde jedes Teams' : 'die Summe aller Runden jedes Teams';
+
   return (
     <div className="guide">
       <header className="guide-hero card">
@@ -60,12 +63,14 @@ export function GuideView({ settings: s, inGame }: { settings: Settings; inGame:
       <section id="g-ueberblick" className="card">
         <h3>Auf einen Blick</h3>
         <div className="facts">
-          <Fact icon="🗓️" value={`${s.days} Tage`} label={inGame ? `ab ${fmtDate(s.startDate)}` : `Start ${s.dayStart}, Luzern Bahnhof`} />
+          <Fact icon="🗓️" value={s.days === 1 ? '1 Tag' : `${s.days} Tage`} label={inGame ? `ab ${fmtDate(s.startDate)}` : `Start ${s.dayStart}, Luzern Bahnhof`} />
           <Fact icon="⏰" value={`${s.dayStart}–${s.dayEnd}`} label="Spielzeit, danach Ruhephase" />
           <Fact icon="🫣" value={hours(s.hidingMinutes)} label="Zeit zum Verstecken" />
           <Fact icon="🚉" value="≤ 1000 m" label="Hiding Spot bis zum nächsten Bahnhof" />
           <Fact icon="🪙" value={`${s.diceCost} Coins`} label="pro Curse-Würfel" />
           <Fact icon="⏳" value={`${s.cooldownMinutes} min`} label="Pause pro Fragen-Kategorie" />
+          <Fact icon="🏆" value={s.scoring === 'best' ? 'Beste Runde' : 'Summe'} label="zählt für die Wertung" />
+          <Fact icon="⏱️" value={limit ? `max. ${limit}` : 'kein Limit'} label="Hiding-Zeit pro Runde" />
         </div>
       </section>
 
@@ -99,8 +104,19 @@ export function GuideView({ settings: s, inGame }: { settings: Settings; inGame:
             <div>
               <strong>Suchphase</strong>
               <p>
-                Die Seeker reisen los und stellen Fragen. Die Hiders antworten, sammeln Coins und würfeln Curses. Jetzt läuft die Hiding-Zeit
+                Die Seeker reisen los und stellen Fragen{s.oneQuestionAtATime ? ', immer eine nach der anderen' : ''}. Die Hiders antworten, sammeln Coins und
+                würfeln Curses. Bis zum Endspiel dürfen sie sich in ihrer Gemeinde bewegen. Jetzt läuft die Hiding-Zeit
                 {s.countHidingPhase ? ' (die Versteckphase zählt in diesem Spiel auch dazu)' : ''}.
+              </p>
+            </div>
+          </li>
+          <li>
+            <span className="step-icon">🔒</span>
+            <div>
+              <strong>Endspiel</strong>
+              <p>
+                Sobald mindestens ein Seeker in der Gemeinde der Hiders ist und den ÖV verlassen hat, startet jemand in der App das Endspiel. Ab dann bewegen
+                sich die Hiders nicht mehr: Ihr Ort in diesem Moment ist der Hiding Spot.
               </p>
             </div>
           </li>
@@ -108,14 +124,17 @@ export function GuideView({ settings: s, inGame }: { settings: Settings; inGame:
             <span className="step-icon">🎯</span>
             <div>
               <strong>Gefunden</strong>
-              <p>Wer die Hiders findet, drückt in der App auf „Gefunden!“. Die Hiding-Zeit des Teams wird gespeichert.</p>
+              <p>
+                Wer die Hiders findet, drückt in der App auf „Gefunden!“. Die Hiding-Zeit des Teams wird gespeichert.
+                {limit && ` Nach ${limit} Hiding-Zeit endet die Runde automatisch mit der vollen Zeit (Rundenlimit).`}
+              </p>
             </div>
           </li>
           <li>
             <span className="step-icon">🔁</span>
             <div>
               <strong>Nächste Runde</strong>
-              <p>Ein anderes Team versteckt sich. Am Schluss gewinnt das Team mit der längsten Hiding-Zeit.</p>
+              <p>Das nächste Team versteckt sich – jedes Team gleich oft. Am Schluss zählt {scoring}.</p>
             </div>
           </li>
         </ol>
@@ -129,8 +148,9 @@ export function GuideView({ settings: s, inGame }: { settings: Settings; inGame:
             <ul>
               <li>Euer Standort wird in der App nicht geteilt (früher: Life360 ausschalten).</li>
               <li>In {hours(s.hidingMinutes)} in eine Gemeinde, die mindestens stündlich per Zug erreichbar ist.</li>
-              <li>Hiding Spot: höchstens 1000 m Luftlinie vom nächsten Bahnhof, frei zugänglich (nichts Eingezäuntes).</li>
-              <li>Fragen ehrlich und rechtzeitig beantworten, Fotos per WhatsApp schicken.</li>
+              <li>Bis zum Endspiel dürft ihr euch in der Gemeinde bewegen – aber nur an Orten, die als Hiding Spot gelten (siehe Regeln).</li>
+              <li>Endspiel: ab sofort nicht mehr bewegen. Die App merkt sich euren Spot auf eurer Karte.</li>
+              <li>Fragen ehrlich und rechtzeitig beantworten, Fotos per WhatsApp schicken. Zu spät = keine Coins und eure Zeit steht still.</li>
               <li>Coins sammeln und Curses würfeln.</li>
             </ul>
           </div>
@@ -138,7 +158,10 @@ export function GuideView({ settings: s, inGame }: { settings: Settings; inGame:
             <h4>🔎 Seeker</h4>
             <ul>
               <li>App offen lassen – euer Standort wird automatisch geteilt.</li>
-              <li>Fragen stellen, pro Kategorie alle {s.cooldownMinutes} Minuten eine.</li>
+              <li>
+                Fragen stellen{s.oneQuestionAtATime ? ', eine nach der anderen' : ''} – pro Kategorie alle {s.cooldownMinutes} Minuten eine.
+              </li>
+              <li>In der Gemeinde der Hiders und ausgestiegen? Endspiel starten.</li>
               <li>Curses sofort erledigen, dokumentieren (Foto/Video) und den Hiders schicken.</li>
               <li>Nur in Züge steigen, die vor {s.dayEnd} ankommen.</li>
               <li>Hiders gefunden? „Gefunden!“ drücken.</li>
@@ -150,8 +173,8 @@ export function GuideView({ settings: s, inGame }: { settings: Settings; inGame:
       <section id="g-fragen" className="card">
         <h3>Fragen</h3>
         <p>
-          Die Seeker stellen Fragen gratis – die <strong>Hiders bekommen dafür Coins</strong>. Relativ- und Radar-Fragen beziehen sich auf den Standort der
-          Seeker beim Fragen; die App schickt ihn automatisch mit.
+          Die Seeker stellen Fragen gratis – die <strong>Hiders bekommen Coins, wenn sie rechtzeitig antworten</strong>. Relativ- und Radar-Fragen beziehen
+          sich auf den Standort der Seeker beim Fragen; die App schickt ihn automatisch mit.
         </p>
         <table className="table">
           <thead>
@@ -178,6 +201,8 @@ export function GuideView({ settings: s, inGame }: { settings: Settings; inGame:
             In der gleichen Kategorie darf nur alle {s.cooldownMinutes} Minuten eine Frage gestellt werden, über verschiedene Kategorien hinweg ist das egal
             {s.cooldownScope === 'team' ? ' (in diesem Spiel zählt das pro Seeker-Team)' : ''}.
           </li>
+          {s.oneQuestionAtATime && <li>Es ist immer nur eine Frage offen: Die nächste geht erst, wenn die vorherige beantwortet ist.</li>}
+          <li>Zu spät beantwortet: keine Coins, und die Hiding-Zeit steht still, bis die Antwort kommt.</li>
           <li>Radar: {RADAR_DISTANCES.map(radarLabel).join(', ')} oder ein selbst gewählter Radius.</li>
           <li>Geht eine Foto-Frage nicht (z.B. kein McDonalds, kein Gemeindehaus), melden die Hiders das – die Coins behalten sie trotzdem.</li>
         </ul>
@@ -203,6 +228,10 @@ export function GuideView({ settings: s, inGame }: { settings: Settings; inGame:
             Die Hiders kaufen mit ihren Coins Würfel. {dice}
           </li>
           <li>Die Curse geht sofort an die Seeker. „Bevor ihr euch bewegt / etwas anderes tut“ heisst: zuerst die Curse, dann alles andere.</li>
+          <li>
+            Es darf immer nur <strong>eine</strong> Curse aktiv sein, die Fragen oder Reisen blockiert – das sind alle ausser Curse 16 „Analog“. Neue Würfel
+            gibt es erst, wenn die Seeker die aktive Curse erledigt haben.
+          </li>
           <li>
             <strong>Jede Curse muss dokumentiert und den Hiders gesendet werden.</strong>
           </li>
@@ -231,7 +260,7 @@ export function GuideView({ settings: s, inGame }: { settings: Settings; inGame:
         <h4>Zeit & Reisen</h4>
         <ul className="rules">
           <li>
-            Das Game dauert {s.days} Tage (Start {s.dayStart} Luzern Bahnhof) und endet am letzten Tag um {s.dayEnd}.
+            Das Game dauert {s.days === 1 ? '1 Tag' : `${s.days} Tage`} (Start {s.dayStart} Luzern Bahnhof) und endet am letzten Tag um {s.dayEnd}.
           </li>
           <li>
             Jeden Tag beginnt die Ruhephase um {s.dayEnd} und endet am nächsten Morgen um {s.dayStart}. In der Ruhephase ist das Game vollständig gestoppt.
@@ -251,11 +280,28 @@ export function GuideView({ settings: s, inGame }: { settings: Settings; inGame:
               abgezäunten Gebiete etc.).
             </strong>
           </li>
+          <li>
+            <New /> Der Hiding Spot ist während der ganzen Spielzeit öffentlich zugänglich, liegt direkt an einer Strasse oder einem Weg, der auf der Karte
+            eingezeichnet ist (höchstens ca. 3 m daneben), und ist nicht in einer Toilette, Wohnung oder einem Laden.
+          </li>
+          <li>
+            <New /> <strong>Endspiel:</strong> Sobald mindestens ein Seeker in der Gemeinde der Hiders ist und kein ÖV mehr benutzt, beginnt das Endspiel (in
+            der App starten). Der Ort der Hiders in diesem Moment ist der Hiding Spot – ab dann bewegen sie sich nicht mehr. Stehen sie gerade nicht an einem
+            gültigen Spot, gehen sie auf direktem Weg zum nächsten gültigen Ort.
+          </li>
         </ul>
         <h4>Fragen & Antworten</h4>
         <ul className="rules">
-          <li>Danach starten die Seeker und können mit den Fragen die Location der Hiders eingrenzen. Jede Frage gibt den Hiders Coins.</li>
+          <li>Danach starten die Seeker und können mit den Fragen die Location der Hiders eingrenzen. Jede rechtzeitig beantwortete Frage gibt den Hiders Coins.</li>
           <li>In der gleichen Kategorie darf nur alle {s.cooldownMinutes} Minuten eine Frage gestellt werden. Übergreifend ist dies egal.</li>
+          {s.oneQuestionAtATime && (
+            <li>
+              <New /> Eine neue Frage darf erst gestellt werden, wenn die vorherige beantwortet ist.
+            </li>
+          )}
+          <li>
+            <New /> Kommt eine Antwort zu spät, steht die Hiding-Zeit still, bis sie da ist, und die Hiders bekommen für diese Frage keine Coins.
+          </li>
           <li>
             Foto-Fragen müssen innerhalb von 15 Minuten beantwortet sein. Geht es nicht (z.B. kein McDonalds oder kein Gemeindehaus), muss man das melden –
             die Coins gibt es aber nicht zurück.
@@ -265,9 +311,26 @@ export function GuideView({ settings: s, inGame }: { settings: Settings; inGame:
         <ul className="rules">
           <li>Jeder Würfel kostet {s.diceCost} Coins.</li>
           <li>
+            <New /> {dice}
+          </li>
+          <li>
+            <New /> Es darf höchstens eine Curse gleichzeitig aktiv sein, die Fragen oder Reisen blockiert (alle ausser Curse 16).
+          </li>
+          <li>
             <strong>Jede Curse muss dokumentiert und den Hiders gesendet werden.</strong>
           </li>
           <li>Falls ihr eine Curse nicht erledigen könnt, müsst ihr das den Hiders erklären und stattdessen die nächsthöhere Curse machen.</li>
+        </ul>
+        <h4>Wertung</h4>
+        <ul className="rules">
+          <li>
+            <New /> Jedes Team versteckt sich gleich oft. Es zählt {scoring}. Abgebrochene Runden zählen nicht.
+          </li>
+          {limit && (
+            <li>
+              <New /> Rundenlimit: Nach {limit} Hiding-Zeit endet die Runde, und das Team bekommt die vollen {limit}. So kommen alle Teams dran.
+            </li>
+          )}
         </ul>
         <h4>Fairplay</h4>
         <ul className="rules">
@@ -313,22 +376,16 @@ export function GuideView({ settings: s, inGame }: { settings: Settings; inGame:
 
       <section id="g-offen" className="card">
         <h3>Vor dem Start klären</h3>
-        <p className="muted small">Diese Punkte stehen nicht in den Regeln. Sprecht sie ab, bevor es losgeht:</p>
+        <p className="muted small">
+          Diese Punkte stehen noch nicht in den Regeln. Sprecht sie ab, bevor es losgeht. Mit <New /> markierte Regeln sind neu dazugekommen (nach den
+          Jet-Lag-Regeln auf lifack.ch).
+        </p>
         <ul className="rules">
           <li>
             <strong>Was gilt als „gefunden“?</strong> Sehen, berühren, auf ein paar Meter herankommen?
           </li>
           <li>
-            <strong>Dürfen sich die Hiders in der Suchphase bewegen?</strong> Sie sehen die Seeker auf der Karte und könnten ihnen sonst ewig ausweichen.
-          </li>
-          <li>
             <strong>Welche Verkehrsmittel sind erlaubt?</strong> Die Regeln nennen nur den Zug – was ist mit Bus, Tram, Schiff, Velo, Taxi?
-          </li>
-          <li>
-            <strong>Was passiert, wenn eine Antwort zu spät kommt?</strong>
-          </li>
-          <li>
-            <strong>Wie oft versteckt sich jedes Team?</strong> Wer ist als Nächstes dran, und zählt die Summe oder die beste Runde?
           </li>
           <li>
             <strong>Was gilt nachts?</strong> Wo übernachten Hiders und Seeker, und darf man sich in der Ruhephase bewegen?
@@ -337,6 +394,10 @@ export function GuideView({ settings: s, inGame }: { settings: Settings; inGame:
       </section>
     </div>
   );
+}
+
+function New() {
+  return <span className="tag new">neu</span>;
 }
 
 function Fact({ icon, value, label }: { icon: string; value: string; label: string }) {

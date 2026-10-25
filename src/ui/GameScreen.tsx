@@ -66,14 +66,19 @@ export function GameScreen({ api, me, code, mode, onLeave }: { api: GameApi; me:
     setTab('mehr');
     window.scrollTo(0, 0);
   }, []);
+  const openSettings = useCallback(() => {
+    setMoreSub('einstellungen');
+    setTab('mehr');
+    window.scrollTo(0, 0);
+  }, []);
 
   useNewEventAlerts(api, me, toast);
   useLocationSharing(api, me, role === 'hider', geo.pos);
   useWakeLock();
 
   const ctx: GameCtx = useMemo(
-    () => ({ api, state, me, mode, code, geo, round, role, myTeam, setTab, openGuide, run, toast, leave: onLeave }),
-    [api, state, me, mode, code, geo, round, role, myTeam, openGuide, run, toast, onLeave],
+    () => ({ api, state, me, mode, code, geo, round, role, myTeam, setTab, openGuide, openSettings, run, toast, leave: onLeave }),
+    [api, state, me, mode, code, geo, round, role, myTeam, openGuide, openSettings, run, toast, onLeave],
   );
 
   const badges: Partial<Record<TabKey, number>> = {
@@ -145,8 +150,14 @@ function useNewEventAlerts(api: GameApi, me: string, toast: (t: string, k?: Toas
     const role = roleOf(state, me, round);
     const myTeamId = state.players[me]?.teamId ?? null;
     for (const ev of fresh) {
-      if (ev.playerId === me) continue;
       const p = ev.payload ?? {};
+      if (ev.playerId === me) {
+        // Eigene Aktion, die von den Regeln abgelehnt wurde (z.B. gleichzeitig mit jemand anderem)
+        if (ev.type === 'question_asked' && !state.questions.some((q) => q.id === p.id))
+          toast('Frage nicht gestellt: Es ist noch eine Frage offen.', 'error');
+        if (ev.type === 'curse_cast' && !state.curses.some((c) => c.id === p.id)) toast('Curse nicht gekauft: Es ist noch eine Curse aktiv.', 'error');
+        continue;
+      }
       if (ev.type === 'question_asked' && role === 'hider') {
         const q = state.questions.find((x) => x.id === p.id);
         if (q) {
@@ -166,6 +177,10 @@ function useNewEventAlerts(api: GameApi, me: string, toast: (t: string, k?: Toas
           toast(`🎲 ${title}`);
           alertUser('Ihr wurdet verflucht!', title);
         }
+      } else if (ev.type === 'endgame_started' && role !== 'none') {
+        const msg = role === 'hider' ? 'Ab jetzt nicht mehr bewegen – euer Ort ist der Hiding Spot.' : 'Die Hiders stehen jetzt still.';
+        toast(`🔒 Endspiel! ${msg}`);
+        alertUser('Endspiel!', msg);
       } else if (ev.type === 'round_started') {
         const msg = `Neue Runde: ${teamName(state, p.hiderTeamId)} versteckt sich`;
         toast(`🫣 ${msg}`);

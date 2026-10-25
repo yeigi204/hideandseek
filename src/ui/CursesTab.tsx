@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { CURSES, curseDef, MAX_CURSE } from '../game/catalog';
-import { activeCurses, curseAutoEnd, playerName, roundCoins, teamName } from '../game/reducer';
+import { activeCurses, blockingCurse, curseAutoEnd, playerName, roundCoins, teamName } from '../game/reducer';
 import type { Curse } from '../game/types';
 import { useNow } from '../hooks/useNow';
 import { uid } from '../lib/ids';
@@ -53,6 +53,7 @@ function DicePanel() {
   const count = Math.min(dice, Math.max(1, maxDice));
   const cost = count * diceCost;
   const seekerTeams = state.teams.filter((t) => t.id !== round.hiderTeamId);
+  const blocking = blockingCurse(state, round.id, target);
 
   const cast = async (number: number, rolls: number[] | null) => {
     const ok = await run(() =>
@@ -81,7 +82,7 @@ function DicePanel() {
     <Section title="Curse kaufen" right={<span className="coins">🪙 {coins}</span>}>
       {maxDice < 1 ? (
         <Empty>
-          Ein Würfel kostet {diceCost} Coins – ihr habt {coins}. Jede Frage der Seeker bringt euch Coins.
+          Ein Würfel kostet {diceCost} Coins – ihr habt {coins}. Jede rechtzeitig beantwortete Frage bringt euch Coins.
         </Empty>
       ) : (
         <>
@@ -110,6 +111,12 @@ function DicePanel() {
               </div>
             </div>
           )}
+          {blocking && (
+            <div className="banner warn">
+              Curse {blocking.number} „{curseDef(blocking.number)?.title}“ ist noch aktiv. Es darf nur eine Curse gleichzeitig Fragen oder Reisen
+              blockieren – neue Würfel gibt es, sobald die Seeker sie erledigt haben.
+            </div>
+          )}
           {rolling && (
             <div className="dice-row">
               {rolling.map((r, i) => (
@@ -121,10 +128,10 @@ function DicePanel() {
           )}
           {!manual ? (
             <div className="row">
-              <button className="btn big primary grow" onClick={rollDigital} disabled={!!rolling}>
+              <button className="btn big primary grow" onClick={rollDigital} disabled={!!rolling || !!blocking}>
                 🎲 Würfeln ({cost} Coins)
               </button>
-              <button className="btn" onClick={() => setManual(true)}>
+              <button className="btn" onClick={() => setManual(true)} disabled={!!blocking}>
                 Echte Würfel
               </button>
             </div>
@@ -146,7 +153,9 @@ function DicePanel() {
                 value={manualValue}
                 onChange={(e) => setManualValue(e.target.value)}
               />
-              <button className="btn primary">Senden</button>
+              <button className="btn primary" disabled={!!blocking}>
+                Senden
+              </button>
               <button type="button" className="btn ghost" onClick={() => setManual(false)}>
                 ✕
               </button>

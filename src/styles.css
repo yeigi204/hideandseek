@@ -1463,3 +1463,19 @@ button.list-row {
 .map-lock-box {
   max-width: 320px;
 }
+.link-btn.inline {
+  display: inline;
+  padding: 0;
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+}
+.tag.new {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+  vertical-align: 1px;
+}
+.paused {
+  color: var(--muted);
+}

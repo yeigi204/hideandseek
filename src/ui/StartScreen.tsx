@@ -5,6 +5,7 @@ import { defaultSettings } from '../game/reducer';
 import { normalizeCode, uid } from '../lib/ids';
 import { forgetGame, savedGames, setPlayerId } from '../lib/storage';
 import { now } from '../lib/time';
+import { DaysPicker, ScheduleSummary } from './components';
 import { GuideView } from './GuideView';
 
 export function StartScreen({ onOpen }: { onOpen: (code: string, mode: BackendMode) => void }) {
@@ -118,6 +119,7 @@ function CreateGame({ onCreated, onCancel }: { onCreated: (code: string, mode: B
   const [teamCount, setTeamCount] = useState(3);
   const [myTeam, setMyTeam] = useState(0);
   const [startDate, setStartDate] = useState(defaults.startDate);
+  const [days, setDays] = useState(defaults.days);
   const [local, setLocal] = useState(!onlineAvailable);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -134,7 +136,7 @@ function CreateGame({ onCreated, onCancel }: { onCreated: (code: string, mode: B
       const backend = getBackend(mode);
       const playerId = uid();
       const teams = TEAM_COLORS.slice(0, teamCount).map((c) => ({ id: uid(), name: `Team ${c.name}`, color: c.color }));
-      const code = await backend.createGame(playerId, { name: name.trim() || 'Hide and Seek', settings: { ...defaults, startDate }, teams });
+      const code = await backend.createGame(playerId, { name: name.trim() || 'Hide and Seek', settings: { ...defaults, startDate, days }, teams });
       await backend.addEvent(code, playerId, 'player_joined', { id: playerId, name: playerName.trim(), teamId: teams[myTeam]?.id ?? null });
       setPlayerId(mode, code, playerId, name);
       onCreated(code, mode);
@@ -187,10 +189,15 @@ function CreateGame({ onCreated, onCancel }: { onCreated: (code: string, mode: B
           ))}
         </div>
       </div>
+      <div className="field">
+        <span>Spieldauer</span>
+        <DaysPicker value={days} onChange={setDays} />
+      </div>
       <label className="field">
-        <span>Starttag (Spiel läuft 2 Tage, 07:00–19:00)</span>
+        <span>Starttag (gespielt wird jeweils {defaults.dayStart}–{defaults.dayEnd})</span>
         <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
       </label>
+      <ScheduleSummary settings={{ ...defaults, startDate, days }} />
       <label className="check">
         <input type="checkbox" checked={local} disabled={!onlineAvailable} onChange={(e) => setLocal(e.target.checked)} />
         <span>

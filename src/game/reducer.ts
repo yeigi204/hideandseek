@@ -1,5 +1,5 @@
 import { addActive, activeDuration, gameWindows, localDateString, wallClock, type Interval } from '../lib/time';
-import { category, curseDef, MAX_CURSE, radarLabel } from './catalog';
+import { category, curseBlocks, curseDef, MAX_CURSE, radarLabel } from './catalog';
 import type { Curse, GameEvent, GameState, Pause, Question, Round, Settings } from './types';
 
 export function defaultSettings(t: number): Settings {
@@ -16,6 +16,9 @@ export function defaultSettings(t: number): Settings {
     diceCost: 50,
     diceSides: 6,
     splitCount: null,
+    oneQuestionAtATime: true,
+    scoring: 'best',
+    maxHidingMinutes: 300,
   };
 }
 
@@ -59,10 +62,14 @@ export function openRound(s: GameState): Round | undefined {
   return last && last.endedAt == null && s.endedAt == null ? last : undefined;
 }
 
-/** Münzen der Hiders in einer Runde */
+export function answeredLate(q: Question): boolean {
+  return q.answeredAt != null && q.answeredAt > q.deadline;
+}
+
+/** Münzen der Hiders in einer Runde: nur für rechtzeitig beantwortete Fragen */
 export function roundCoins(s: GameState, roundId: string) {
   let earned = 0;
-  for (const q of s.questions) if (q.roundId === roundId && !q.cancelled) earned += q.coins;
+  for (const q of s.questions) if (q.roundId === roundId && !q.cancelled && q.answeredAt != null && !answeredLate(q)) earned += q.coins;
   for (const a of s.coinAdjustments) if (a.roundId === roundId) earned += a.delta;
   let spent = 0;
   for (const c of s.curses) if (c.roundId === roundId) spent += c.cost;
@@ -81,6 +88,17 @@ function addPauseForCurse(round: Round, curse: Curse) {
   });
 }
 
+/** Aktive Curse, die Fragen oder Reisen blockiert und das Ziel betrifft (null = alle Seeker) */
+export function blockingCurse(s: GameState, roundId: string, targetTeamId: string | null): Curse | undefined {
+  return s.curses.find(
+    (c) =>
+      c.roundId === roundId &&
+      c.status === 'active' &&
+      curseBlocks(c.number) &&
+      (targetTeamId == null || c.targetTeamId == null || c.targetTeamId === targetTeamId),
+  );
+}
+
 function log(s: GameState, ev: GameEvent, icon: string, text: string) {
   s.log.push({ at: ev.at, icon, text, seq: ev.seq });
 }
@@ -95,6 +113,7 @@ function apply(s: GameState, ev: GameEvent) {
       s.createdAt = ev.at;
       s.createdBy = ev.playerId;
       s.settings = { ...defaultSettings(ev.at), ...(p.settings ?? {}) };
+      s.windows = gameWindows(s.settings);
       s.teams = Array.isArray(p.teams) ? p.teams.map((t: { id: string; name: string; color: string }) => ({ ...t })) : [];
       log(s, ev, '🎬', `Spiel „${s.name}“ erstellt`);
       break;
@@ -102,6 +121,7 @@ function apply(s: GameState, ev: GameEvent) {
     case 'settings_updated': {
       if (p.name) s.name = String(p.name);
       if (p.settings) s.settings = { ...s.settings, ...p.settings };
+      s.windows = gameWindows(s.settings);
       log(s, ev, '⚙️', `${who} hat die Einstellungen geändert`);
       break;
     }
@@ -171,15 +191,30 @@ function apply(s: GameState, ev: GameEvent) {
     case 'round_ended': {
       if (!round || round.id !== p.roundId) break;
       round.endedAt = ev.at;
-      round.endReason = p.reason === 'aborted' ? 'aborted' : 'found';
+      round.endReason = p.reason === 'aborted' ? 'aborted' : p.reason === 'limit' ? 'limit' : 'found';
       for (const pause of round.pauses) if (pause.minutes == null && pause.endedAt == null) pause.endedAt = ev.at;
       for (const c of s.curses) if (c.roundId === round.id && c.status === 'active') c.status = 'skipped';
-      log(
-        s,
-        ev,
-        round.endReason === 'found' ? '🎯' : '⏹️',
-        round.endReason === 'found' ? `${teamName(s, round.hiderTeamId)} wurde gefunden!` : `Runde ${round.number} abgebrochen`,
-      );
+      const endText = {
+        found: ['🎯', `${teamName(s, round.hiderTeamId)} wurde gefunden!`],
+        limit: ['⏱️', `Rundenlimit erreicht – ${teamName(s, round.hiderTeamId)} bleibt unentdeckt`],
+        aborted: ['⏹️', `Runde ${round.number} abgebrochen (zählt nicht)`],
+        gameover: ['🏁', ''],
+      }[round.endReason];
+      log(s, ev, endText[0], endText[1]);
+      break;
+    }
+    case 'endgame_started': {
+      if (!round || round.id !== p.roundId || round.endgameAt != null) break;
+      round.endgameAt = ev.at;
+      round.endgameBy = ev.playerId;
+      log(s, ev, '🔒', `Endspiel (${who}): Die Hiders stehen ab jetzt still`);
+      break;
+    }
+    case 'endgame_cancelled': {
+      if (!round || round.id !== p.roundId || round.endgameAt == null) break;
+      round.endgameAt = undefined;
+      round.endgameBy = undefined;
+      log(s, ev, '🔓', `${who} hat das Endspiel zurückgenommen`);
       break;
     }
     case 'pause_started': {
@@ -202,6 +237,10 @@ function apply(s: GameState, ev: GameEvent) {
       if (!round || round.id !== p.roundId) break;
       if (s.questions.some((q) => q.id === p.id)) break;
       const cat = category(p.category);
+      if (s.settings.oneQuestionAtATime && openQuestions(s, round.id).length > 0) {
+        log(s, ev, '🚫', `Frage von ${who} nicht gestellt – es war noch eine Frage offen`);
+        break;
+      }
       const q: Question = {
         id: p.id,
         roundId: p.roundId,
@@ -217,8 +256,9 @@ function apply(s: GameState, ev: GameEvent) {
         pos: p.pos && typeof p.pos.lat === 'number' ? p.pos : undefined,
         deadline: Infinity,
       };
+      q.deadline = addActive(q.askedAt, q.answerMinutes * 60000, s.windows);
       s.questions.push(q);
-      log(s, ev, cat?.emoji ?? '❓', `${who} fragt (${cat?.name ?? 'Frage'}): ${questionLabel(q)} · +${q.coins} Coins`);
+      log(s, ev, cat?.emoji ?? '❓', `${who} fragt (${cat?.name ?? 'Frage'}): ${questionLabel(q)}`);
       break;
     }
     case 'question_answered': {
@@ -228,7 +268,8 @@ function apply(s: GameState, ev: GameEvent) {
       q.impossible = !!p.impossible;
       q.answeredAt = ev.at;
       q.answeredBy = ev.playerId;
-      log(s, ev, q.impossible ? '🚫' : '💬', `Antwort auf „${questionLabel(q)}“: ${q.impossible ? 'nicht möglich' : q.answer}`);
+      const reward = answeredLate(q) ? 'zu spät, keine Coins' : `+${q.coins} Coins`;
+      log(s, ev, q.impossible ? '🚫' : '💬', `Antwort auf „${questionLabel(q)}“: ${q.impossible ? 'nicht möglich' : q.answer} · ${reward}`);
       break;
     }
     case 'question_cancelled': {
@@ -244,6 +285,11 @@ function apply(s: GameState, ev: GameEvent) {
       const dice = Math.max(0, Math.round(Number(p.dice ?? 1)));
       const cost = Number(p.cost ?? dice * s.settings.diceCost);
       if (roundCoins(s, round.id).balance < cost) break;
+      const blocking = blockingCurse(s, round.id, p.targetTeamId ?? null);
+      if (blocking) {
+        log(s, ev, '🚫', `Keine neue Curse: Curse ${blocking.number} ist noch aktiv`);
+        break;
+      }
       const curse: Curse = {
         id: p.id,
         roundId: round.id,
@@ -345,7 +391,7 @@ function apply(s: GameState, ev: GameEvent) {
       s.endedAt = ev.at;
       if (round) {
         round.endedAt = ev.at;
-        round.endReason = 'aborted';
+        round.endReason = 'gameover';
         for (const pause of round.pauses) if (pause.minutes == null && pause.endedAt == null) pause.endedAt = ev.at;
       }
       log(s, ev, '🏁', `${who} hat das Spiel beendet`);
@@ -409,25 +455,60 @@ export function roundPhase(r: Round, t: number): RoundPhase {
   return t < r.seekStartAt ? 'hiding' : 'seeking';
 }
 
-export function activePause(r: Round, t: number): Pause | undefined {
-  return r.pauses.find((p) => p.start <= t && t < p.end);
+/** Alle Pausen einer Runde: manuelle, Curse 20 und überfällige Antworten (bis sie kommen) */
+function roundPauses(s: GameState, r: Round): { start: number; end: number; reason: string }[] {
+  const list = r.pauses.map((p) => ({ start: p.start, end: p.end, reason: p.reason }));
+  for (const q of s.questions) {
+    if (q.roundId !== r.id || q.cancelled || !isFinite(q.deadline)) continue;
+    const answered = q.answeredAt ?? Infinity;
+    if (answered > q.deadline) list.push({ start: q.deadline, end: answered, reason: `Antwort überfällig: ${questionLabel(q)}` });
+  }
+  return list;
 }
 
-/** Hiding-Zeit einer Runde bis Zeitpunkt t */
-export function hidingTime(s: GameState, r: Round, t: number): number {
+export function activePause(s: GameState, r: Round, t: number) {
+  return roundPauses(s, r).find((p) => p.start <= t && t < p.end);
+}
+
+function rawHidingTime(s: GameState, r: Round, t: number): number {
   const from = s.settings.countHidingPhase ? r.startedAt : r.seekStartAt;
   const until = Math.min(t, r.endedAt ?? Infinity, s.endedAt ?? Infinity);
-  const pauses = r.pauses.map((p) => ({ start: p.start, end: Math.min(p.end, until) }));
+  const pauses = roundPauses(s, r).map((p) => ({ start: p.start, end: Math.min(p.end, until) }));
   return activeDuration(from, until, s.windows, pauses);
+}
+
+const limitMs = (s: GameState) => (s.settings.maxHidingMinutes ? s.settings.maxHidingMinutes * 60000 : Infinity);
+
+/** Hiding-Zeit einer Runde bis Zeitpunkt t (höchstens das Rundenlimit) */
+export function hidingTime(s: GameState, r: Round, t: number): number {
+  return Math.min(rawHidingTime(s, r, t), limitMs(s));
+}
+
+export function limitReached(s: GameState, r: Round, t: number): boolean {
+  return r.endedAt == null && rawHidingTime(s, r, t) >= limitMs(s);
+}
+
+/** Runden, die für die Wertung zählen (abgebrochene nicht) */
+export function countedRounds(s: GameState, teamId: string) {
+  return s.rounds.filter((r) => r.hiderTeamId === teamId && r.endReason !== 'aborted');
 }
 
 export function teamTotals(s: GameState, t: number) {
   return s.teams
     .map((team) => {
-      const rounds = s.rounds.filter((r) => r.hiderTeamId === team.id);
-      return { team, rounds: rounds.length, total: rounds.reduce((sum, r) => sum + hidingTime(s, r, t), 0) };
+      const times = countedRounds(s, team.id).map((r) => hidingTime(s, r, t));
+      const total = s.settings.scoring === 'best' ? Math.max(0, ...times) : times.reduce((a, b) => a + b, 0);
+      return { team, rounds: times.length, total };
     })
     .sort((a, b) => b.total - a.total);
+}
+
+/** Teams, die als Nächstes verstecken dürfen: nur die mit den wenigsten gezählten Runden */
+export function teamsOnTurn(s: GameState): Set<string> {
+  const candidates = s.teams.filter((t) => Object.values(s.players).some((p) => p.teamId === t.id));
+  const counts = candidates.map((t) => countedRounds(s, t.id).length);
+  const min = Math.min(...counts);
+  return new Set(candidates.filter((_, i) => counts[i] === min).map((t) => t.id));
 }
 
 /** Bis wann eine Kategorie gesperrt ist (null = frei) */

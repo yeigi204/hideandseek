@@ -188,17 +188,38 @@ export function MapTab({ visible }: { visible: boolean }) {
     return () => window.clearTimeout(id);
   }, [visible, geo.pos]);
 
+  // Hider: Ort beim Start des Endspiels merken – nur auf diesem Gerät, wird nicht geteilt
+  const spotKey = round?.endgameAt != null && role === 'hider' ? `spot:${round.id}:${round.endgameAt}` : null;
+  const [spot, setSpot] = useState<LatLng | null>(null);
+  useEffect(() => {
+    if (!spotKey) {
+      setSpot(null);
+      return;
+    }
+    const saved = getPref<LatLng | null>(spotKey, null);
+    if (saved) setSpot(saved);
+    else if (geo.pos) {
+      const here = { lat: geo.pos.lat, lng: geo.pos.lng };
+      setPref(spotKey, here);
+      setSpot(here);
+    }
+  }, [spotKey, geo.pos]);
+
   // Eigener Standort
   useEffect(() => {
     const g = groups.current?.me;
     if (!g) return;
     g.clearLayers();
+    if (spot) {
+      const icon = L.divIcon({ className: '', html: '<div class="pin">⭐</div>', iconSize: [28, 28], iconAnchor: [14, 14] });
+      L.marker([spot.lat, spot.lng], { icon }).bindTooltip('Euer Hiding Spot (Endspiel)', { direction: 'top' }).addTo(g);
+    }
     if (!geo.pos) return;
     L.circle([geo.pos.lat, geo.pos.lng], { radius: geo.pos.accuracy, color: '#3e63dd', weight: 1, fillOpacity: 0.08, interactive: false }).addTo(g);
     L.circleMarker([geo.pos.lat, geo.pos.lng], { radius: 8, color: '#fff', weight: 3, fillColor: '#3e63dd', fillOpacity: 1 })
       .bindTooltip('Du')
       .addTo(g);
-  }, [geo.pos]);
+  }, [geo.pos, spot]);
 
   // Andere Spieler (Hider werden nie angezeigt)
   const hiderTeam = round?.hiderTeamId;

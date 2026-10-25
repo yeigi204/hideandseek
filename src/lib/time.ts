@@ -85,7 +85,7 @@ export function zonedToEpoch(year: number, month: number, day: number, hour: num
 }
 
 export function parseHM(hm: string): [number, number] {
-  const m = /^(\d{1,2}):(\d{2})$/.exec(hm.trim());
+  const m = /^(\d{1,2}):(\d{2})(?::\d{2}(?:\.\d+)?)?$/.exec(hm.trim());
   if (!m) return [0, 0];
   return [Math.min(24, Number(m[1])), Math.min(59, Number(m[2]))];
 }

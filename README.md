@@ -7,21 +7,23 @@ Läuft im Browser auf jedem Handy. Am besten über „Zum Startbildschirm hinzuf
 ## Was die App kann
 
 - **Spiel & Teams:** Spiel erstellen, Code teilen, mitspielen. Alle Daten sind live auf allen Handys synchron.
-- **Spielzeit:** 2 Tage, 07:00–19:00. In der Ruhephase (19:00–07:00) stoppen alle Uhren automatisch. Ein Countdown zeigt an, bis wann man noch in einen Zug steigen darf.
+- **Spielzeit:** 1–5 Tage wählbar, 07:00–19:00. In der Ruhephase (19:00–07:00) stehen alle Uhren automatisch still, auch Antwortzeiten und Sperrzeiten. Ein Countdown zeigt an, bis wann man noch in einen Zug steigen darf.
 - **Runden:**
   - Das Hider-Team hat 2 h Versteckzeit.
-  - Danach läuft die Hiding-Zeit, bis „Gefunden!“ gedrückt wird.
+  - Danach läuft die Hiding-Zeit, bis „Gefunden!“ gedrückt wird oder das Rundenlimit (Standard 5 h) erreicht ist.
+  - **Endspiel:** Sind die Seeker in der Gemeinde der Hiders und aus dem ÖV ausgestiegen, wird das Endspiel gestartet. Ab dann bewegen sich die Hiders nicht mehr; die App merkt sich ihren Spot (nur auf ihrem Handy). Hiders sehen laufend, wie weit der nächste Seeker weg ist.
+  - Jedes Team versteckt sich gleich oft, gewertet wird die beste Runde. Abgebrochene Runden zählen nicht.
   - Eine Pause ist möglich, z.B. bei einem Notfall.
-  - Die Rangliste zeigt die gesamte Hiding-Zeit pro Team.
 - **Fragen:**
   - Alle Kategorien aus dem Regeldokument: Relativ, Radar, Foto, Kunterbunt und Präzision.
-  - Die Coins gehen automatisch an die Hiders.
-  - Die App zeigt die Antwortzeit (5 bzw. 15 min) und den 30-min-Cooldown pro Kategorie.
+  - Immer nur eine offene Frage; dazu der 30-min-Cooldown pro Kategorie.
+  - Die Hiders bekommen die Coins, wenn sie rechtzeitig antworten (5 bzw. 15 min). Zu spät: keine Coins, und ihre Hiding-Zeit steht still, bis die Antwort kommt.
 - **Hilfe für Hiders:**
   - Beim Antworten macht die App Vorschläge aus dem GPS: Nord/Süd, Ost/West, Radar-Distanz, nächster Flughafen, Kanton/Gemeinde, Grossregion und nächster Bahnhof.
   - Die Vorschläge bitte trotzdem kurz prüfen.
 - **Curses:**
   - Würfel kaufen (50 Coins pro Würfel, Summe = Curse-Nummer) oder echte Würfel verwenden und das Ergebnis eintippen.
+  - Nur eine Curse gleichzeitig darf Fragen oder Reisen blockieren (alle ausser Curse 16). Solange sie aktiv ist, gibt es keine neuen Würfel.
   - Die Seeker werden sofort benachrichtigt.
   - Seeker haken eine Curse als „Erledigt“ ab. Ist sie nicht machbar, gilt die nächsthöhere.
   - Timer für Wartezeiten sind eingebaut.
