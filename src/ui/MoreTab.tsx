@@ -10,13 +10,13 @@ import { fmtDayClock, fmtDuration } from '../lib/time';
 import { Empty, Section, TeamChip } from './components';
 import { useGameCtx } from './context';
 import { notificationsSupported, requestNotifications } from './notify';
-import { RulesView } from './RulesView';
+import { GuideView } from './GuideView';
 import { StartRoundDialog } from './StatusTab';
 
-type Sub = 'spiel' | 'kasse' | 'regeln' | 'einstellungen';
+export type MoreSub = 'spiel' | 'kasse' | 'regeln' | 'einstellungen';
 
-export function MoreTab() {
-  const [sub, setSub] = useState<Sub>('spiel');
+export function MoreTab({ sub, setSub }: { sub: MoreSub; setSub: (s: MoreSub) => void }) {
+  const { state } = useGameCtx();
   return (
     <div className="stack">
       <div className="seg full">
@@ -26,7 +26,7 @@ export function MoreTab() {
             ['kasse', 'Kasse'],
             ['regeln', 'Regeln'],
             ['einstellungen', 'Einstellungen'],
-          ] as [Sub, string][]
+          ] as [MoreSub, string][]
         ).map(([k, label]) => (
           <button key={k} className={sub === k ? 'on' : ''} onClick={() => setSub(k)}>
             {label}
@@ -35,7 +35,7 @@ export function MoreTab() {
       </div>
       {sub === 'spiel' && <GameView />}
       {sub === 'kasse' && <KasseView />}
-      {sub === 'regeln' && <RulesView />}
+      {sub === 'regeln' && <GuideView settings={state.settings} inGame />}
       {sub === 'einstellungen' && <SettingsView />}
     </div>
   );

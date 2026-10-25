@@ -1213,3 +1213,253 @@ button.list-row {
     border-color: var(--border);
   }
 }
+
+/* ---------- Anleitung ---------- */
+
+.guide {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.guide section {
+  scroll-margin-top: 72px;
+}
+.guide h3 {
+  margin-bottom: 8px;
+  font-size: 1.1rem;
+}
+.guide-hero {
+  border-left: 6px solid var(--accent);
+}
+.guide-hero h2 {
+  font-size: 1.3rem;
+  margin-bottom: 6px;
+}
+.guide-toc {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 2px 2px 6px;
+  scrollbar-width: none;
+}
+.guide-toc a {
+  flex: none;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  text-decoration: none;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+.fact {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+.fact-icon {
+  font-size: 1.3rem;
+}
+.fact strong {
+  font-size: 1.15rem;
+}
+.fact small {
+  color: var(--muted);
+  line-height: 1.25;
+}
+.daybar {
+  margin: 6px 0 12px;
+}
+.daybar-track {
+  position: relative;
+  height: 34px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: repeating-linear-gradient(135deg, #7c6cf0 0 8px, #8f81f3 8px 16px);
+}
+.daybar-play {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--ok);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.daybar-labels {
+  position: relative;
+  height: 20px;
+  margin-top: 4px;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.daybar-labels span {
+  position: absolute;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+.daybar-labels span.first {
+  left: 0;
+  transform: none;
+}
+.daybar-labels span.last {
+  right: 0;
+  transform: none;
+}
+.daybar-legend {
+  display: flex;
+  gap: 14px;
+  font-size: 0.85rem;
+  margin-top: 4px;
+}
+.sw {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  vertical-align: -1px;
+  margin-right: 4px;
+}
+.sw.play {
+  background: var(--ok);
+}
+.sw.rest {
+  background: #7c6cf0;
+}
+.steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  position: relative;
+}
+.steps li {
+  display: flex;
+  gap: 12px;
+  position: relative;
+  padding-bottom: 12px;
+}
+.steps li:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 19px;
+  top: 40px;
+  bottom: 0;
+  width: 2px;
+  background: var(--border);
+}
+.steps p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+.step-icon {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+}
+.roles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 10px;
+}
+.role-card {
+  border-radius: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-top: 5px solid var(--accent);
+}
+.role-card.seeker {
+  border-top-color: #3e63dd;
+}
+.role-card h4 {
+  margin: 2px 0 6px;
+}
+.role-card ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 0.92rem;
+}
+.role-card li {
+  margin: 4px 0;
+}
+.guide-details {
+  border-top: 1px solid var(--border);
+  padding: 8px 0 0;
+  margin-top: 8px;
+}
+.guide-details summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 4px 0;
+}
+.guide-details ul,
+.guide-details ol {
+  padding-left: 22px;
+  font-size: 0.92rem;
+}
+.curse-list li {
+  margin: 8px 0;
+}
+.curse-list p {
+  margin: 2px 0 0;
+  color: var(--muted);
+}
+.app-tabs {
+  margin: 0;
+}
+.app-tabs dt {
+  font-weight: 700;
+  margin-top: 8px;
+}
+.app-tabs dd {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+.guide-page {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 12px 12px 40px;
+}
+.guide-page-head {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: calc(8px + env(safe-area-inset-top)) 0 8px;
+  background: var(--bg);
+}
+.map-lock {
+  position: absolute;
+  inset: 0;
+  z-index: 1100;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+}
+.map-lock-box {
+  max-width: 320px;
+}

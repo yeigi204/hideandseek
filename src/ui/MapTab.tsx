@@ -1,14 +1,14 @@
 import L from 'leaflet';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { RADAR_DISTANCES, radarLabel } from '../game/catalog';
-import { questionLabel, roundQuestions } from '../game/reducer';
+import { curseAutoEnd, questionLabel, roundQuestions } from '../game/reducer';
 import type { MapMarker, Question } from '../game/types';
 import { useNow } from '../hooks/useNow';
 import { CH_BOUNDS, circleRing, distance, fetchStations, fmtDistance, type LatLng, type Station } from '../lib/geo';
 import { uid } from '../lib/ids';
 import { getPref, setPref } from '../lib/storage';
-import { fmtAgo } from '../lib/time';
-import { Modal } from './components';
+import { fmtAgo, fmtClock } from '../lib/time';
+import { Countdown, Modal } from './components';
 import { useGameCtx } from './context';
 
 const BASE_LAYERS = {
@@ -341,6 +341,16 @@ export function MapTab({ visible }: { visible: boolean }) {
     setToolsOpen(false);
   };
 
+  // Curse 16 „Analog“: keine mobilen Karten-Hilfsmittel für die verfluchten Seeker
+  const analogUntil =
+    role === 'seeker' && round
+      ? state.curses
+          .filter((c) => c.roundId === round.id && c.number === 16 && c.status !== 'skipped')
+          .filter((c) => c.targetTeamId == null || c.targetTeamId === myTeam?.id)
+          .map((c) => curseAutoEnd(state, c) ?? 0)
+          .find((end) => end > t)
+      : undefined;
+
   let shareText: string;
   if (role === 'hider') shareText = '🫣 Ihr seid Hider – euer Standort wird nicht geteilt.';
   else if (!sharePref) shareText = '🔕 Standort-Teilen ist aus (Mehr → Einstellungen).';
@@ -351,6 +361,18 @@ export function MapTab({ visible }: { visible: boolean }) {
   return (
     <div className={`map-tab ${visible ? '' : 'hidden'}`}>
       <div ref={el} className={`map ${tool !== 'none' ? 'crosshair' : ''}`} />
+      {analogUntil != null && (
+        <div className="map-lock">
+          <div className="map-lock-box">
+            <div className="hero-icon">📵</div>
+            <h2>Curse 16: Analog</h2>
+            <p>Keine mobilen Hilfsmittel – auch nicht diese Karte.</p>
+            <p>
+              Wieder frei um {fmtClock(analogUntil)} (noch <Countdown to={analogUntil} />)
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="map-top">
         <div className="seg small">

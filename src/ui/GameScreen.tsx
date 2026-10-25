@@ -9,7 +9,7 @@ import { getPref } from '../lib/storage';
 import { CursesTab } from './CursesTab';
 import { Ctx, type GameCtx, type TabKey, type ToastKind } from './context';
 import { MapTab } from './MapTab';
-import { MoreTab } from './MoreTab';
+import { MoreTab, type MoreSub } from './MoreTab';
 import { alertUser } from './notify';
 import { QuestionsTab } from './QuestionsTab';
 import { StatusTab } from './StatusTab';
@@ -34,6 +34,7 @@ const SHARE_MIN_MOVE_M = 25;
 export function GameScreen({ api, me, code, mode, onLeave }: { api: GameApi; me: string; code: string; mode: BackendMode; onLeave: () => void }) {
   const { state } = api;
   const [tab, setTab] = useState<TabKey>('status');
+  const [moreSub, setMoreSub] = useState<MoreSub>('spiel');
   const [toasts, setToasts] = useState<Toast[]>([]);
   const geo = useGeolocation(true);
   const round = openRound(state);
@@ -60,13 +61,19 @@ export function GameScreen({ api, me, code, mode, onLeave }: { api: GameApi; me:
     [toast],
   );
 
+  const openGuide = useCallback(() => {
+    setMoreSub('regeln');
+    setTab('mehr');
+    window.scrollTo(0, 0);
+  }, []);
+
   useNewEventAlerts(api, me, toast);
   useLocationSharing(api, me, role === 'hider', geo.pos);
   useWakeLock();
 
   const ctx: GameCtx = useMemo(
-    () => ({ api, state, me, mode, code, geo, round, role, myTeam, setTab, run, toast, leave: onLeave }),
-    [api, state, me, mode, code, geo, round, role, myTeam, run, toast, onLeave],
+    () => ({ api, state, me, mode, code, geo, round, role, myTeam, setTab, openGuide, run, toast, leave: onLeave }),
+    [api, state, me, mode, code, geo, round, role, myTeam, openGuide, run, toast, onLeave],
   );
 
   const badges: Partial<Record<TabKey, number>> = {
@@ -97,7 +104,7 @@ export function GameScreen({ api, me, code, mode, onLeave }: { api: GameApi; me:
           {tab === 'fragen' && <QuestionsTab />}
           <MapTab visible={tab === 'karte'} />
           {tab === 'curses' && <CursesTab />}
-          {tab === 'mehr' && <MoreTab />}
+          {tab === 'mehr' && <MoreTab sub={moreSub} setSub={setMoreSub} />}
         </main>
 
         <nav className="tabbar">

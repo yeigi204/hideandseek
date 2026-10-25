@@ -374,13 +374,13 @@ function HintPanel({ kind, question, onUse }: { kind: HintKind; question: Questi
   const suggestion = (label: string, answer: string, detail?: string) => (
     <div className="hint">
       <div>
-        🤖 Vorschlag: <strong>{label}</strong>
+        📐 Berechnet: <strong>{label}</strong>
         {detail && <span className="muted small"> · {detail}</span>}
       </div>
       <button className="btn small" onClick={() => onUse(answer)}>
         Übernehmen
       </button>
-      <div className="muted small">Berechnet aus GPS – bitte kurz prüfen.</div>
+      <div className="muted small">Geometrie aus den GPS-Standorten, keine KI – bitte kurz prüfen.</div>
     </div>
   );
 

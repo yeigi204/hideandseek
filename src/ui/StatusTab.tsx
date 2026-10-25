@@ -80,7 +80,7 @@ function ClockCard() {
 }
 
 function RoundCard() {
-  const { state, round, role, api, run } = useGameCtx();
+  const { state, round, role, api, run, openGuide } = useGameCtx();
   const t = useNow();
   const [startOpen, setStartOpen] = useState(false);
 
@@ -92,6 +92,9 @@ function RoundCard() {
         <p className="muted">Startet eine Runde, sobald das Hider-Team bereit ist. Die Hiders haben dann {state.settings.hidingMinutes} Minuten Zeit.</p>
         <button className="btn primary block" onClick={() => setStartOpen(true)}>
           Runde starten
+        </button>
+        <button className="btn ghost block" onClick={openGuide}>
+          📖 Wie funktioniert das Spiel?
         </button>
         <StartRoundDialog open={startOpen} onClose={() => setStartOpen(false)} />
       </Section>

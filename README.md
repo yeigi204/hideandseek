@@ -31,8 +31,9 @@ Läuft im Browser auf jedem Handy. Am besten über „Zum Startbildschirm hinzuf
   - Beantwortete Radar- und Himmelsrichtungs-Fragen werden als rote Ausschlussgebiete eingezeichnet.
   - Werkzeuge: Distanz messen, Kreise ziehen (wie „smappen“) und Markierungen setzen. Kreise und Markierungen sieht nur das eigene Team.
   - Alle Bahnhöfe im Ausschnitt lassen sich mit ihrer 1-km-Zone anzeigen (Hiding-Spot-Regel).
+  - Während Curse 16 „Analog“ ist die Karte für die betroffenen Seeker gesperrt.
 - **Kasse:** Kassenbons erfassen. Die App teilt durch die Anzahl Personen und zeigt, wer wem wie viel zahlt.
-- **Regeln:** Das ganze Regelwerk ist in der App nachlesbar.
+- **Anleitung & Regeln:** Erklärseite für alle Mitspielenden: Tagesablauf, Ablauf einer Runde, Rollen, Fragen, Curses, das ganze Regelwerk und die Punkte, die man vor dem Start absprechen sollte. Erreichbar auf der Startseite (auch ohne Spiel), unter *Mehr → Regeln* und im Status.
 - **Testmodus:** Ein Spiel nur auf einem Gerät, ohne Server. Mehrere Browser-Tabs sind dann mehrere Spieler.
 
 ## Wichtig zu wissen

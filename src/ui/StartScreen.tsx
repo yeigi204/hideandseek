@@ -5,11 +5,26 @@ import { defaultSettings } from '../game/reducer';
 import { normalizeCode, uid } from '../lib/ids';
 import { forgetGame, savedGames, setPlayerId } from '../lib/storage';
 import { now } from '../lib/time';
+import { GuideView } from './GuideView';
 
 export function StartScreen({ onOpen }: { onOpen: (code: string, mode: BackendMode) => void }) {
   const [games, setGames] = useState(savedGames);
   const [joinCode, setJoinCode] = useState('');
   const [showCreate, setShowCreate] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
+
+  if (showGuide) {
+    return (
+      <div className="guide-page">
+        <div className="guide-page-head">
+          <button className="btn" onClick={() => setShowGuide(false)}>
+            ← Zurück
+          </button>
+        </div>
+        <GuideView settings={defaultSettings(now())} inGame={false} />
+      </div>
+    );
+  }
 
   return (
     <div className="start">
@@ -81,6 +96,13 @@ export function StartScreen({ onOpen }: { onOpen: (code: string, mode: BackendMo
           </ul>
         </section>
       )}
+
+      <button className="btn ghost block" onClick={() => {
+          window.scrollTo(0, 0);
+          setShowGuide(true);
+        }}>
+        📖 Anleitung & Regeln
+      </button>
 
       <p className="muted small center">
         Tipp: Im Browser-Menü „Zum Startbildschirm hinzufügen“ wählen, dann startet die App wie eine normale App.
