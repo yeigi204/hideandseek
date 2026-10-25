@@ -345,7 +345,7 @@ export function MapTab({ visible }: { visible: boolean }) {
       });
       toast(`${found.length} Bahnhöfe geladen`, 'ok');
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Bahnhöfe konnten nicht geladen werden', 'error');
+      toast(`${err instanceof Error ? err.message : 'Bahnhöfe konnten nicht geladen werden.'} Bitte gleich nochmals versuchen.`, 'error');
     } finally {
       setLoadingStations(false);
     }

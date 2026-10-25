@@ -122,3 +122,21 @@ export function ScheduleSummary({ settings }: { settings: ScheduleSettings }) {
     </p>
   );
 }
+
+/** Bahnhof-Suche fehlgeschlagen: verständliche Meldung, neuer Versuch, Details zum Aufklappen */
+export function StationLookupFailed({ error, details, onRetry }: { error: string; details?: string; onRetry: () => void }) {
+  return (
+    <div className="stack-sm">
+      <span className="small">⚠️ {error} Meist klappt es nach ein paar Sekunden wieder.</span>
+      <button type="button" className="btn small" onClick={onRetry}>
+        🔄 Nochmals versuchen
+      </button>
+      {details && (
+        <details className="small muted">
+          <summary>Details</summary>
+          {details}
+        </details>
+      )}
+    </div>
+  );
+}

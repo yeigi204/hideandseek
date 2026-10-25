@@ -24,7 +24,7 @@ import {
 } from '../lib/geo';
 import { uid } from '../lib/ids';
 import { clockState, fmtAgo, fmtClock, now } from '../lib/time';
-import { Countdown, Empty, ExternalLinks, Modal, Section } from './components';
+import { Countdown, Empty, ExternalLinks, Modal, Section, StationLookupFailed } from './components';
 import { useGameCtx } from './context';
 import { useNearestStation } from './useNearestStation';
 
@@ -471,9 +471,14 @@ function PlaceHint({ kind, mine, theirs, onUse }: { kind: 'canton' | 'grossregio
 }
 
 function StationHint({ pos, onUse }: { pos: LatLng; onUse: (a: string) => void }) {
-  const res = useNearestStation(pos);
+  const { result: res, retry } = useNearestStation(pos);
   if (!res || res.status === 'loading') return <div className="hint">🚉 Suche nächsten Bahnhof …</div>;
-  if (res.status === 'error') return <div className="hint">Bahnhof-Suche nicht möglich: {res.error}</div>;
+  if (res.status === 'error')
+    return (
+      <div className="hint">
+        <StationLookupFailed error={res.error} details={res.details} onRetry={retry} />
+      </div>
+    );
   if (res.status === 'none') return <div className="hint">Kein Bahnhof im Umkreis von 2.5 km gefunden.</div>;
   // Luftlinie × 1.3 als grobe Wegstrecke, 4.5 km/h
   const minutes = Math.max(1, Math.round(((res.dist * 1.3) / 4500) * 60));

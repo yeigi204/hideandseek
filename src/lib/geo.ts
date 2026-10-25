@@ -118,21 +118,118 @@ export interface Station {
   pos: LatLng;
 }
 
+/** Öffentliche Overpass-Server (OpenStreetMap). Der Hauptserver ist oft überlastet (502/504/429). */
+export const OVERPASS_ENDPOINTS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.private.coffee/api/interpreter',
+  'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+];
+let preferredEndpoint = 0;
+
+export class StationLookupError extends Error {
+  constructor(readonly failures: string[]) {
+    super('Die Kartenserver für die Bahnhof-Suche sind gerade überlastet.');
+  }
+}
+
+async function fetchJson(url: string, init: RequestInit = {}, timeoutMs = 15000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { ...init, signal: ctrl.signal });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    throw ctrl.signal.aborted ? new Error('Zeitüberschreitung') : err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+interface OverpassNode {
+  id: number;
+  lat: number;
+  lon: number;
+  tags?: Record<string, string>;
+}
+
+/** Fragt die Overpass-Server der Reihe nach an; der zuletzt funktionierende kommt zuerst. */
+async function overpass(query: string): Promise<OverpassNode[]> {
+  const failures: string[] = [];
+  for (let i = 0; i < OVERPASS_ENDPOINTS.length; i++) {
+    const idx = (preferredEndpoint + i) % OVERPASS_ENDPOINTS.length;
+    const url = OVERPASS_ENDPOINTS[idx];
+    try {
+      const data = await fetchJson(url, { method: 'POST', body: new URLSearchParams({ data: query }) });
+      if (!Array.isArray(data?.elements)) throw new Error('ungültige Antwort');
+      // Bei Überlast kommt teils HTTP 200 mit leerer Liste und einer Fehlermeldung
+      if (!data.elements.length && typeof data.remark === 'string' && /error|timeout|timed out/i.test(data.remark)) throw new Error(data.remark);
+      preferredEndpoint = idx;
+      return data.elements;
+    } catch (err) {
+      failures.push(`${new URL(url).host}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+  throw new StationLookupError(failures);
+}
+
+const stationCache = new Map<string, { at: number; stations: Station[] }>();
+const STATION_CACHE_MS = 60 * 60000;
+
 /** Bahnhöfe/Haltestellen der Bahn im Ausschnitt über OpenStreetMap (Overpass). */
 export async function fetchStations(bounds: { south: number; west: number; north: number; east: number }): Promise<Station[]> {
-  const bbox = `${bounds.south},${bounds.west},${bounds.north},${bounds.east}`;
+  const bbox = [bounds.south, bounds.west, bounds.north, bounds.east].map((x) => x.toFixed(4)).join(',');
+  const cached = stationCache.get(bbox);
+  if (cached && Date.now() - cached.at < STATION_CACHE_MS) return cached.stations;
   const query = `[out:json][timeout:20];node["railway"~"^(station|halt)$"]["station"!~"subway|light_rail|funicular|miniature|monorail"](${bbox});out body;`;
-  const res = await fetch('https://overpass-api.de/api/interpreter', {
-    method: 'POST',
-    body: new URLSearchParams({ data: query }),
-  });
-  if (!res.ok) throw new Error(`Bahnhof-Suche fehlgeschlagen (${res.status})`);
-  const data = await res.json();
-  return (data.elements ?? []).map((e: { id: number; lat: number; lon: number; tags?: Record<string, string> }) => ({
+  const stations = (await overpass(query)).map((e) => ({
     id: e.id,
     name: e.tags?.name ?? 'Bahnhof',
     pos: { lat: e.lat, lng: e.lon },
   }));
+  stationCache.set(bbox, { at: Date.now(), stations });
+  return stations;
+}
+
+export interface NearestStationResult {
+  name: string;
+  dist: number;
+  source: 'osm' | 'timetable';
+}
+
+/** Ersatzquelle: Fahrplan-API (transport.opendata.ch), nur Haltestellen mit Zug. */
+async function nearestTrainFromTimetable(p: LatLng): Promise<NearestStationResult | null> {
+  const data = await fetchJson(`https://transport.opendata.ch/v1/locations?x=${p.lat}&y=${p.lng}&type=station`, {}, 10000);
+  const list: { name?: string; icon?: string; coordinate?: { x?: number; y?: number } }[] = data?.stations ?? [];
+  const trains = list
+    .filter((st) => st.icon === 'train' && typeof st.coordinate?.x === 'number' && typeof st.coordinate?.y === 'number')
+    .map((st) => {
+      // Die API liefert x = Breite, y = Länge; sicherheitshalber prüfen
+      let { x, y } = st.coordinate as { x: number; y: number };
+      if (x < 20 && y > 40) [x, y] = [y, x];
+      return { name: st.name ?? 'Bahnhof', dist: distance(p, { lat: x, lng: y }), source: 'timetable' as const };
+    })
+    .sort((a, b) => a.dist - b.dist);
+  return trains[0] ?? null;
+}
+
+/** Nächster Bahnhof im Umkreis von 2.5 km; null = keiner gefunden. */
+export async function nearestStation(p: LatLng): Promise<NearestStationResult | null> {
+  try {
+    const list = await fetchStations(boundsAround(p, 2500));
+    const best = list.map((st) => ({ name: st.name, dist: distance(p, st.pos), source: 'osm' as const })).sort((a, b) => a.dist - b.dist)[0];
+    return best ?? null;
+  } catch (err) {
+    if (!(err instanceof StationLookupError)) throw err;
+    try {
+      const fallback = await nearestTrainFromTimetable(p);
+      if (fallback) return fallback;
+    } catch (fallbackErr) {
+      err.failures.push(`transport.opendata.ch: ${fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr)}`);
+    }
+    throw err;
+  }
 }
 
 export function boundsAround(p: LatLng, meters: number) {

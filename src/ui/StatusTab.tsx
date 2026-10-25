@@ -18,7 +18,7 @@ import { useNow } from '../hooks/useNow';
 import { distance, fmtDistance } from '../lib/geo';
 import { uid } from '../lib/ids';
 import { clockState, fmtAgo, fmtClock, fmtDayClock, fmtDuration, fmtDurationWords } from '../lib/time';
-import { Countdown, Empty, Modal, Section, TeamChip } from './components';
+import { Countdown, Empty, Modal, Section, StationLookupFailed, TeamChip } from './components';
 import { useGameCtx } from './context';
 import { useNearestStation } from './useNearestStation';
 
@@ -396,7 +396,7 @@ function NearestSeeker() {
 function SpotCheck() {
   const { geo } = useGameCtx();
   const [open, setOpen] = useState(false);
-  const station = useNearestStation(geo.pos, open);
+  const { result: station, retry } = useNearestStation(geo.pos, open);
   return (
     <details className="guide-details" open={open} onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}>
       <summary>📍 Spot prüfen</summary>
@@ -405,12 +405,13 @@ function SpotCheck() {
       ) : !station || station.status === 'loading' ? (
         <p className="muted small">🚉 Suche nächsten Bahnhof …</p>
       ) : station.status === 'error' ? (
-        <p className="muted small">Bahnhof-Suche nicht möglich: {station.error}</p>
+        <StationLookupFailed error={station.error} details={station.details} onRetry={retry} />
       ) : station.status === 'none' ? (
         <p className="overdue">✗ Kein Bahnhof im Umkreis von 2.5 km.</p>
       ) : (
         <p className={station.dist <= 1000 ? 'pos' : 'overdue'}>
           {station.dist <= 1000 ? '✓' : '✗'} {station.name}: {fmtDistance(station.dist)} Luftlinie (max. 1000 m)
+          {station.source === 'timetable' && <span className="muted small"> · Quelle: SBB-Fahrplan</span>}
         </p>
       )}
       <ul className="hints">
